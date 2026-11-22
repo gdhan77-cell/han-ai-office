@@ -272,6 +272,7 @@ body.panel-hidden .panel{display:none}
 .ceo-col h3{font-size:.78rem;font-weight:800;display:flex;align-items:center;gap:.35rem;margin-bottom:.4rem;color:var(--ink)}
 .ceo-col h3 .n{font-size:.66rem;background:var(--paper3);border:1px solid var(--line);border-radius:999px;padding:0 .36rem;color:var(--ink2);font-weight:700}
 .queue{display:flex;flex-direction:column;gap:.35rem;padding-right:.1rem}
+.queue > *, .todo > *{flex:0 0 auto}
 .queue-item{
   border:1px solid var(--line);background:var(--paper2);border-radius:10px;padding:.4rem .45rem;
   display:flex;gap:.4rem;align-items:flex-start;transition:border-color .15s,background .15s;
@@ -294,7 +295,7 @@ body.panel-hidden .panel{display:none}
   padding:.7rem .6rem;text-align:center;background:var(--paper2);line-height:1.5;
 }
 .todo{display:flex;flex-direction:column;gap:.35rem}
-.todo-item{border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:8px;background:var(--paper2);padding:.38rem .45rem}
+.todo-item{flex:0 0 auto;border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:8px;background:var(--paper2);padding:.38rem .45rem}
 .todo-item b{font-size:.75rem;display:block}
 .todo-item ul{font-size:.7rem;color:var(--ink2);margin-top:.14rem}
 .todo-item li{margin-bottom:.08rem}
