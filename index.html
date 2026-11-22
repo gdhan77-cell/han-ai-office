@@ -302,6 +302,8 @@ body.panel-hidden .panel{display:none}
 
 /* ---------- 우측 패널 ---------- */
 .panel{position:sticky;top:4.4rem;display:flex;flex-direction:column;gap:.7rem;max-height:calc(100vh - 5.2rem);overflow:auto;padding-bottom:.5rem}
+.panel > *{flex:0 0 auto}
+.card{flex-shrink:0}
 .card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
 .card-head{display:flex;align-items:center;gap:.4rem;padding:.6rem .7rem;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#FFFDF8,#FBF5E9)}
 .card-head h3{font-size:.86rem;font-weight:800;display:flex;align-items:center;gap:.36rem}
