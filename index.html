@@ -2161,7 +2161,8 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
       return '<div class="msg user"><div class="mhead"><b>대표님 지시</b><span>' + when + '</span></div><pre>' + esc(m.text) + '</pre>' + refs + file + '</div>';
     }
     if (m.role === 'ai') {
-      return '<div class="msg ai"><div class="mhead"><b>' + esc((PROVIDERS[m.provider] && PROVIDERS[m.provider].label) || '직원') + ' 보고서</b><span>' + when + '</span></div><pre>' + esc(m.text) + '</pre>' +
+      const who = m.provider === 'demo' ? '데모 보고서(모의)' : esc((PROVIDERS[m.provider] && PROVIDERS[m.provider].label) || '직원') + ' 보고서';
+      return '<div class="msg ai"><div class="mhead"><b>' + who + '</b><span>' + when + '</span></div><pre>' + esc(m.text) + '</pre>' +
         '<div class="macts"><button type="button" class="btn small ghost" data-copy="' + m.at + '">복사</button></div></div>';
     }
     return '<div class="msg sys"><div class="mhead"><span>' + when + '</span></div><pre>' + esc(m.text) + '</pre></div>';
@@ -2175,6 +2176,7 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
     lines.push('- 오피스: ' + state.settings.company);
     lines.push('- 부서: ' + (FLOOR_BY_ID[d.floor] ? FLOOR_BY_ID[d.floor].no : '') + ' ' + d.name + ' (' + d.who + ')');
     lines.push('- 담당 AI: ' + aiLabel(t.ai === 'auto' ? deptAI(d) : t.ai));
+    if (t.messages.some((m) => m.role === 'ai' && m.provider === 'demo')) lines.push('- 생성 방식: 데모 모드의 모의 보고서(실제 AI 응답 아님)');
     lines.push('- 상태: ' + statusText(t));
     lines.push('- 맡긴 때: ' + fmtTime(t.created) + ' · 최근: ' + fmtTime(t.updated));
     if (t.refs.length) lines.push('- 넘겨받은 자료: ' + t.refs.map((r) => r.dept + ' 「' + r.title + '」').join(', '));
