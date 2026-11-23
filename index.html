@@ -2886,6 +2886,7 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
   /* ────────────────────────── 11. 이벤트 ────────────────────────── */
   function onClick(ev) {
     const tgt = ev.target;
+    if (tgt && tgt.id === 'photoFile') return;
     const hit = (sel) => tgt.closest(sel);
 
     if (hit('[data-close]')) { closeModal(); return; }
@@ -3056,6 +3057,7 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
     $('btnExportJson').addEventListener('click', exportJson);
     $('btnDownloadAll').addEventListener('click', downloadAllReports);
     $('btnResetAll').addEventListener('click', resetAll);
+    $('photoFile').addEventListener('click', (ev) => { ev.stopPropagation(); });
     $('photoFile').addEventListener('change', (ev) => {
       const f = ev.target.files && ev.target.files[0];
       applyPhoto(f);
