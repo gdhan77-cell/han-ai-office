@@ -221,6 +221,19 @@ body.panel-hidden .panel{display:none}
 .chip.ok{background:var(--ok-soft);border-color:#CBE0CE;color:var(--ok)}
 
 .rooms{display:grid;grid-template-columns:repeat(auto-fit,minmax(13.4rem,1fr));gap:.5rem}
+.av-photo{width:100%;height:100%;object-fit:cover;border-radius:12px;display:block}
+.photo-mini{border:1px solid var(--line2);background:var(--paper);color:var(--ink2);border-radius:8px;
+  padding:.16rem .42rem;font-size:.76rem;line-height:1.2;cursor:pointer;flex:0 0 auto;margin-left:auto}
+.photo-mini:hover{background:var(--paper2);border-color:var(--line)}
+.photo-list{display:grid;gap:.15rem;max-height:24rem;overflow:auto}
+.photo-row{display:flex;align-items:center;gap:.45rem;padding:.22rem .25rem;border-radius:9px}
+.photo-row:hover{background:var(--paper2)}
+.photo-row .pv{width:2.1rem;height:2.1rem;flex:0 0 auto;border-radius:8px;overflow:hidden;display:block;background:var(--paper3)}
+.photo-row .pv svg,.photo-row .pv img{width:100%;height:100%;display:block;object-fit:cover}
+.photo-row .pn{flex:1 1 auto;min-width:0;font-size:.76rem;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.photo-row .pn small{display:block;font-weight:500;font-size:.66rem;color:var(--ink3);white-space:normal}
+.photo-row .pbtns{display:flex;gap:.22rem;flex:0 0 auto}
+.photo-row .pbtns .btn{padding:.2rem .42rem;font-size:.68rem}
 .floor.focused .rooms{grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))}
 .room{
   position:relative;text-align:left;background:var(--paper);border:1px solid var(--line);
@@ -738,6 +751,12 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
         </div>
 
         <div class="set-card">
+          <h3>🖼️ 대표님·직원 사진 <span class="n" id="photoCount">15명</span></h3>
+          <div class="photo-list" id="photoList"></div>
+          <div class="note" style="margin-top:.45rem">사진은 가운데를 정사각형으로 잘라 160×160 JPEG로 줄여 이 브라우저에만 저장합니다. 원본 파일은 바뀌지 않습니다.</div>
+        </div>
+
+        <div class="set-card">
           <h3>🎨 화면</h3>
           <div class="field">
             <label>글자 크기</label>
@@ -845,6 +864,7 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
 
 <div id="modalRoot"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<input type="file" id="photoFile" accept="image/*" class="sr-only" aria-hidden="true" tabindex="-1">
 <script>
 /* ============================================================================
    한경동 AI 오피스 — 앱 스크립트
@@ -1373,6 +1393,96 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
 
   /* 대표(한경동 님) 아바타 */
   const CEO_AVATAR = { skin: '#F0D2B6', hair: '#9A948C', style: 'side', shirt: '#3C3630', glasses: true, prop: '🎩' };
+
+  /* ────────────────────────── 사진(아바타 이미지) ────────────────────────── */
+  function photoOf(id) { return (state.settings.photos && state.settings.photos[id]) || ''; }
+  function avatarBox(id, avatar) {
+    const p = photoOf(id);
+    return '<span class="av" aria-hidden="true">' +
+      (p ? '<img class="av-photo" src="' + esc(p) + '" alt="">' : avatarSVG(avatar)) + '</span>';
+  }
+
+  let photoTarget = '';
+  function photoPeople() {
+    return [{ id: 'ceo', name: '5F 대표실', sub: '대표 ' + state.settings.owner, avatar: CEO_AVATAR }]
+      .concat(DEPTS.map((d) => ({ id: d.id, name: FLOOR_BY_ID[d.floor].no + ' ' + d.name, sub: d.who, avatar: d.avatar })));
+  }
+  function renderPhotoList() {
+    const box = $('photoList');
+    if (!box) return;
+    const list = photoPeople();
+    if ($('photoCount')) $('photoCount').textContent = list.length + '명';
+    box.innerHTML = list.map((p) => {
+      const has = !!photoOf(p.id);
+      return '<div class="photo-row"><span class="pv">' +
+        (has ? '<img src="' + esc(photoOf(p.id)) + '" alt="">' : avatarSVG(p.avatar)) + '</span>' +
+        '<span class="pn">' + esc(p.name) + '<small>' + esc(p.sub) + (has ? ' · 사진 사용 중' : '') + '</small></span>' +
+        '<span class="pbtns">' +
+        '<button type="button" class="btn small ghost" data-photo="' + p.id + '">사진 올리기</button>' +
+        '<button type="button" class="btn small ghost" data-photoreset="' + p.id + '">기본 그림으로</button>' +
+        '</span></div>';
+    }).join('');
+  }
+  function pickPhoto(id) {
+    photoTarget = id || '';
+    const inp = $('photoFile');
+    if (!inp) return;
+    inp.value = '';
+    inp.click();
+  }
+  function applyPhoto(file) {
+    if (!file) return;
+    const id = photoTarget;
+    const fail = (m) => { toast(m); };
+    if (!id) return;
+    if (!/^image\//.test(file.type || '')) { fail('이미지 파일만 올릴 수 있습니다.'); return; }
+    const reader = new FileReader();
+    reader.onerror = () => fail('사진을 읽지 못했습니다. 다른 사진으로 해 보세요.');
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => fail('사진을 읽지 못했습니다. 다른 사진으로 해 보세요.');
+      img.onload = () => {
+        try {
+          const side = Math.min(img.naturalWidth || img.width, img.naturalHeight || img.height);
+          const sx = Math.max(0, ((img.naturalWidth || img.width) - side) / 2);
+          const sy = Math.max(0, ((img.naturalHeight || img.height) - side) / 2);
+          const cv = document.createElement('canvas');
+          cv.width = 160; cv.height = 160;
+          const ctx = cv.getContext('2d');
+          ctx.fillStyle = '#F7EFE0';
+          ctx.fillRect(0, 0, 160, 160);
+          ctx.drawImage(img, sx, sy, side, side, 0, 0, 160, 160);
+          setPhoto(id, cv.toDataURL('image/jpeg', 0.82));
+        } catch (e) { fail('사진을 처리하지 못했습니다. 다른 사진으로 해 보세요.'); }
+      };
+      img.src = String(reader.result || '');
+    };
+    reader.readAsDataURL(file);
+  }
+  function afterPhotoChange() {
+    renderAll();
+    renderPhotoList();
+    if (state.ui.modal) renderModal();
+  }
+  function setPhoto(id, data) {
+    state.settings.photos = state.settings.photos || {};
+    state.settings.photos[id] = data;
+    save(true);
+    let stored = false;
+    try {
+      const raw = localStorage.getItem(LSKEY) || '';
+      stored = raw.indexOf('"' + id + '":"data:image/') >= 0;
+    } catch (e) { stored = false; }
+    afterPhotoChange();
+    toast(stored ? '사진을 바꿨습니다. 이 브라우저에 저장했습니다.' : '사진을 바꿨지만 저장 공간이 모자라 새로 고침하면 되돌아갈 수 있습니다.');
+  }
+  function resetPhoto(id) {
+    if (!(state.settings.photos && state.settings.photos[id])) { toast('이미 기본 그림입니다.'); return; }
+    delete state.settings.photos[id];
+    save(true);
+    afterPhotoChange();
+    toast('기본 그림으로 되돌렸습니다.');
+  }
   /* ────────────────────────── 2. 상태·저장 ────────────────────────── */
   const $ = (id) => document.getElementById(id);
   const $$ = (sel, root) => Array.prototype.slice.call((root || document).querySelectorAll(sel));
@@ -1399,7 +1509,7 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
       keys: { anthropic: '', openai: '', gemini: '', perplexity: '' },
       models: Object.assign({}, DEFAULTS.models),
       mode: 'auto', delegate: 'auto', maxTokens: 2000, scale: 1, proxy: '',
-      deptAI: {}
+      deptAI: {}, photos: {}
     },
     tasks: [],
     seq: 1,
@@ -1430,6 +1540,13 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
       if (typeof d.scale === 'number' && d.scale >= 0.9 && d.scale <= 1.4) s.scale = d.scale;
       if (typeof d.proxy === 'string') s.proxy = d.proxy;
       if (d.deptAI && typeof d.deptAI === 'object') s.deptAI = d.deptAI;
+      if (d.photos && typeof d.photos === 'object') {
+        Object.keys(d.photos).forEach((k) => {
+          if (k === 'ceo' || DEPT_BY_ID[k]) {
+            if (typeof d.photos[k] === 'string' && d.photos[k].indexOf('data:image/') === 0) s.photos[k] = d.photos[k];
+          }
+        });
+      }
     }
     if (Array.isArray(data.tasks)) {
       state.tasks = data.tasks.filter((t) => t && t.id && t.deptId && DEPT_BY_ID[t.deptId]).map((t) => ({
@@ -1613,7 +1730,7 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
       ? '<div class="room-task' + (active ? ' fresh' : '') + '">' + esc(st.last.title) + '</div>'
       : '<div class="room-task">아직 맡긴 일이 없습니다</div>';
     return '<button type="button" class="' + cls + '" data-dept="' + dept.id + '" aria-label="' + esc(dept.name + ' 업무 상세 열기') + '">' +
-      '<span class="av" aria-hidden="true">' + avatarSVG(dept.avatar) + '</span>' +
+      avatarBox(dept.id, dept.avatar) +
       '<span class="room-body">' +
       '<span class="room-top"><span class="room-name">' + esc(dept.name) + '</span>' +
       '<span class="badge ai"><span class="pip" style="background:' + p.tone + '"></span>' + esc(p.label) + '</span></span>' +
@@ -1657,11 +1774,12 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
     }
     const mineTotal = wait.length + todo.length;
     return '<div class="ceo-me">' +
-      '<span class="av" aria-hidden="true">' + avatarSVG(CEO_AVATAR) + '</span>' +
+      avatarBox('ceo', CEO_AVATAR) +
       '<div class="cm-txt"><b>' + esc(state.settings.owner) + ' 대표실</b>' +
       '<small>' + todayLine() + ' · 결재 대기 ' + wait.length + '건 · 후속 확인 ' + todo.length + '건</small></div>' +
       '<div class="cm-acts"><button type="button" class="btn small" data-go="approval">결재함 열기</button>' +
-      '<button type="button" class="btn small ghost" data-compose="1">일 맡기기</button></div></div>' +
+      '<button type="button" class="btn small ghost" data-compose="1">일 맡기기</button>' +
+      '<button type="button" class="btn small ghost" data-photo="ceo" title="대표님 사진 바꾸기">📷 사진</button></div></div>' +
       '<div class="ceo">' +
       '<div class="ceo-col"><h3>📋 대표실 앞 결재 줄 <span class="n">' + wait.length + '</span></h3><div class="queue">' + q + '</div></div>' +
       '<div class="ceo-col"><h3>🙋 대표님 차례 <span class="n">' + todo.length + '</span></h3><div class="todo">' + tl + '</div></div>' +
@@ -1896,6 +2014,7 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
       });
     });
     $('deptAIGrid').innerHTML = g;
+    renderPhotoList();
 
     const st = {
       all: state.tasks.length,
@@ -2403,8 +2522,9 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
     ].join('');
     root.innerHTML = '<div class="scrim" data-close="1"></div>' +
       '<div class="modal" role="dialog" aria-modal="true" aria-label="' + esc(t.title) + ' 업무 상세">' +
-      '<div class="modal-head"><span class="av">' + avatarSVG(d.avatar) + '</span>' +
+      '<div class="modal-head">' + avatarBox(d.id, d.avatar) +
       '<div class="mh-txt"><h3>' + esc(t.title) + '</h3><p>' + esc(FLOOR_BY_ID[d.floor].no + ' ' + d.name + ' · ' + d.who) + '</p></div>' +
+      '<button type="button" class="photo-mini" data-photo="' + d.id + '" title="직원 사진 바꾸기" aria-label="직원 사진 바꾸기">📷</button>' +
       '<button type="button" class="modal-x" data-close="1" aria-label="닫기">✕</button></div>' +
       '<div class="modal-body">' + body + '</div>' +
       '<div class="modal-foot">' + foot + '</div></div>';
@@ -2451,9 +2571,10 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
 
     root.innerHTML = '<div class="scrim" data-close="1"></div>' +
       '<div class="modal" role="dialog" aria-modal="true" aria-label="' + esc(d.name) + ' 업무 기록">' +
-      '<div class="modal-head"><span class="av">' + avatarSVG(d.avatar) + '</span>' +
+      '<div class="modal-head">' + avatarBox(d.id, d.avatar) +
       '<div class="mh-txt"><h3>' + esc(d.name) + ' <span class="chip">' + esc(FLOOR_BY_ID[d.floor].no) + '</span></h3>' +
       '<p>' + esc(d.who) + ' · ' + st.label + ' · 대표님 차례 ' + st.mine + '건</p></div>' +
+      '<button type="button" class="photo-mini" data-photo="' + d.id + '" title="직원 사진 바꾸기" aria-label="직원 사진 바꾸기">📷</button>' +
       '<button type="button" class="modal-x" data-close="1" aria-label="닫기">✕</button></div>' +
       '<div class="modal-body">' + body.join('') + '</div>' +
       '<div class="modal-foot">' + foot + '</div></div>';
@@ -2769,6 +2890,11 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
 
     if (hit('[data-close]')) { closeModal(); return; }
 
+    const ph = hit('[data-photo]');
+    if (ph) { ev.preventDefault(); ev.stopPropagation(); pickPhoto(ph.dataset.photo); return; }
+    const phr = hit('[data-photoreset]');
+    if (phr) { ev.preventDefault(); ev.stopPropagation(); resetPhoto(phr.dataset.photoreset); return; }
+
     const ap = hit('[data-approve]');
     if (ap) { ev.preventDefault(); ev.stopPropagation(); approveTask(ap.dataset.approve); flash('mine'); return; }
     const rj = hit('[data-reject]');
@@ -2930,6 +3056,11 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
     $('btnExportJson').addEventListener('click', exportJson);
     $('btnDownloadAll').addEventListener('click', downloadAllReports);
     $('btnResetAll').addEventListener('click', resetAll);
+    $('photoFile').addEventListener('change', (ev) => {
+      const f = ev.target.files && ev.target.files[0];
+      applyPhoto(f);
+      ev.target.value = '';
+    });
 
     window.addEventListener('beforeunload', () => save(true));
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') save(true); });
