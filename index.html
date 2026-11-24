@@ -915,7 +915,8 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
     if (!TYPES[type]) return null;
     var label = clean(p.label) || (TYPES[type].short + ' ' + (i + 1));
     var pr = Number(p.priority);
-    return {
+    /* hub가 붙이는 lastStatus 같은 모르는 필드도 잃지 않도록 원본을 얹어 둔다 */
+    return Object.assign({}, p, {
       id: clean(p.id) || uid(),
       type: type,
       label: label,
@@ -927,7 +928,7 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
       lastError: clean(p.lastError),
       lastErrorAt: p.lastErrorAt || '',
       lastOkAt: p.lastOkAt || ''
-    };
+    });
   }
   function load() {
     var pool = blank();
@@ -944,6 +945,9 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
     var list = Array.isArray(pool.providers) ? pool.providers : [];
     pool.providers = list.map(normProvider).filter(Boolean);
     pool.claudeFallbackEnabled = pool.claudeFallbackEnabled !== false;
+    /* free-ai-hub가 쓰는 mode 값과 같은 뜻으로 맞춘다 (free_only = 100% 무료만) */
+    if (pool.mode === 'free_only') pool.claudeFallbackEnabled = false;
+    else if (pool.mode === 'claude_fallback') pool.claudeFallbackEnabled = true;
     pool.claudeKey = clean(pool.claudeKey);
     pool.claudeModel = clean(pool.claudeModel) || CLAUDE_MODELS[0];
     if (!pool.version) pool.version = 1;
@@ -955,6 +959,8 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
     var next = Object.assign({}, cur, pool);
     next.version = next.version || 1;
     next.updatedAt = new Date().toISOString();
+    /* 허브와 같은 mode 표기를 함께 기록해 두 앱의 스위치가 어긋나지 않게 한다 */
+    next.mode = next.claudeFallbackEnabled ? 'claude_fallback' : 'free_only';
     next.providers = (next.providers || []).map(function (p) {
       var o = Object.assign({}, p);
       delete o.__ui;
