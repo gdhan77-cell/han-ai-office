@@ -1377,7 +1377,10 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
         btn.disabled = false; btn.textContent = old;
         if (msg) { msg.className = 'hfa-msg ' + (r.ok ? 'ok' : 'err'); msg.textContent = r.message; }
         if (r.ok) {
-          poolMutate(function (pool) { pool.claudeKey = clean(keyEl.value); pool.claudeModel = r.model || clean(modelEl.value); });
+          var pl = load();
+          pl.claudeKey = clean(keyEl.value);
+          pl.claudeModel = r.model || clean(modelEl.value);
+          persist(pl);
         }
         return;
       }
@@ -1413,10 +1416,16 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
         var res = await testProvider(p);
         btn.disabled = false; btn.textContent = '테스트';
         if (m) { m.className = 'hfa-msg ' + (res.ok ? 'ok' : 'err'); m.textContent = res.message; }
-        if (res.ok) poolMutate(function (pool) {
-          var t = pool.providers.find(function (x) { return x.id === id; });
-          if (t) { t.lastError = ''; t.cooldownUntil = 0; t.lastOkAt = new Date().toISOString(); }
-        });
+        if (res.ok) {
+          var pl2 = load();
+          var t = pl2.providers.find(function (x) { return x.id === id; });
+          if (t) {
+            t.lastError = ''; t.cooldownUntil = 0; t.lastOkAt = new Date().toISOString();
+            t.apiKey = clean(row.querySelector('[data-f="apiKey"]').value);
+            t.model = clean(row.querySelector('[data-f="model"]').value) || TYPES[t.type].model;
+          }
+          persist(pl2);
+        }
         return;
       }
     });
