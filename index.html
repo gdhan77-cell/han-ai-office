@@ -2213,6 +2213,8 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
       if (d.models && typeof d.models === 'object') Object.keys(s.models).forEach((k) => { if (typeof d.models[k] === 'string' && d.models[k]) s.models[k] = d.models[k]; });
       /* 2026-11-30 claude-sonnet-4-5 은퇴 → 저장된 모델명 이전 */
       if (s.models.anthropic === 'claude-sonnet-4-5') s.models.anthropic = 'claude-sonnet-5-5';
+      /* 2026-11-25 gemini-2.5-flash 계열 종료(404) → 저장된 모델명 이전 */
+      if (['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite'].indexOf(s.models.gemini) >= 0) s.models.gemini = 'gemini-3.5-flash';
       if (['auto', 'multi', 'delegate', 'demo', 'free'].indexOf(d.mode) >= 0) s.mode = d.mode;
       if (typeof d.delegate === 'string') s.delegate = d.delegate;
       if (typeof d.maxTokens === 'number' && d.maxTokens > 200) s.maxTokens = d.maxTokens;
