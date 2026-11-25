@@ -889,12 +889,33 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
   if (window.HanFreeAI) return;
 
   var POOL_KEY = 'han_free_ai_pool_v1';
+  /* 2026-11-25 기준 실제 호출로 200 OK를 확인한 모델만 남긴다. */
   var TYPES = {
-    gemini: { label: 'Google Gemini', short: 'Gemini', model: 'gemini-2.5-flash', hint: 'aistudio.google.com/apikey', ph: 'AIza…' },
-    groq: { label: 'Groq', short: 'Groq', model: 'llama-3.3-70b-versatile', hint: 'console.groq.com/keys', ph: 'gsk_…' },
-    openrouter: { label: 'OpenRouter', short: 'OpenRouter', model: 'meta-llama/llama-3.3-70b-instruct:free', hint: 'openrouter.ai/keys', ph: 'sk-or-…' }
+    gemini: { label: 'Google Gemini', short: 'Gemini', model: 'gemini-3.5-flash', hint: 'aistudio.google.com/apikey', ph: 'AIza…' },
+    groq: { label: 'Groq', short: 'Groq', model: 'openai/gpt-oss-120b', hint: 'console.groq.com/keys', ph: 'gsk_…' },
+    openrouter: { label: 'OpenRouter', short: 'OpenRouter', model: 'openrouter/free', hint: 'openrouter.ai/keys', ph: 'sk-or-…' }
+  };
+  var MODELS = {
+    gemini: ['gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-3.8-flash', 'gemma-4-26b-a4b-it'],
+    groq: ['openai/gpt-oss-120b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-20b'],
+    openrouter: ['openrouter/free', 'nvidia/nemotron-3-ultra-550b-a55b:free', 'nvidia/nemotron-3.5-lightning:free', 'baidu/ernie-5.5-flash-preview:free', 'google/gemma-4-26b-a4b-it:free']
+  };
+  /* 제공사가 종료·제거한 모델 — 저장된 키 풀에 남아 있으면 새 기본 모델로 자동 치환한다. */
+  var RETIRED = {
+    gemini: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite'],
+    groq: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'qwen/qwen3-32b'],
+    openrouter: ['meta-llama/llama-3.3-70b-instruct:free', 'google/gemma-3-27b-it:free', 'deepseek/deepseek-r1-0528:free', 'qwen/qwen3-235b-a22b:free']
   };
   var CLAUDE_MODELS = ['claude-sonnet-5-5', 'claude-sonnet-4-6', 'claude-sonnet-4-5'];
+  var _migrated = false;
+
+  /* 옛 모델명이면 새 기본 모델로 바꾸고, 바뀐 사실을 표시해 load()에서 저장까지 하게 한다. */
+  function migrateModel(type, model) {
+    var m = clean(model);
+    if (!m || !TYPES[type]) return m;
+    if ((RETIRED[type] || []).indexOf(m) >= 0) { _migrated = true; return TYPES[type].model; }
+    return m;
+  }
 
   function err(code, message, extra) {
     var e = new Error(message);
@@ -921,7 +942,7 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
       type: type,
       label: label,
       apiKey: clean(p.apiKey || p.key || ''),
-      model: clean(p.model) || TYPES[type].model,
+      model: migrateModel(type, p.model) || TYPES[type].model,
       enabled: p.enabled === false ? false : true,
       priority: isFinite(pr) && pr > 0 ? pr : i + 1,
       cooldownUntil: Number(p.cooldownUntil) || 0,
@@ -943,7 +964,10 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
       } catch (e) { /* 깨진 값은 빈 풀로 */ }
     }
     var list = Array.isArray(pool.providers) ? pool.providers : [];
+    _migrated = false;
     pool.providers = list.map(normProvider).filter(Boolean);
+    /* 옛 404 모델명을 새 모델명으로 바꿨다면 곧바로 저장한다(새로고침만으로 바로 동작). */
+    if (_migrated) { try { save(pool); } catch (e) { /* 저장 실패해도 이번 세션은 새 모델로 동작 */ } }
     pool.claudeFallbackEnabled = pool.claudeFallbackEnabled !== false;
     /* free-ai-hub가 쓰는 mode 값과 같은 뜻으로 맞춘다 (free_only = 100% 무료만) */
     if (pool.mode === 'free_only') pool.claudeFallbackEnabled = false;
@@ -1059,7 +1083,9 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
         throw err('blocked', labelOf(p) + '가 이 요청을 거절했습니다(' + j.promptFeedback.blockReason + ')');
       }
     } else {
-      out = (((j && j.choices && j.choices[0] && j.choices[0].message) || {}).content || '').trim();
+      var msg = (j && j.choices && j.choices[0] && j.choices[0].message) || {};
+      /* 추론형 모델은 max_tokens가 작으면 content가 비고 reasoning만 오기도 한다. */
+      out = (msg.content || '').trim() || (msg.reasoning || '').trim();
     }
     if (!out) throw err('empty', labelOf(p) + '가 빈 응답을 보냈습니다');
     return out;
@@ -1213,7 +1239,8 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
       var out = await requestOne(pp, {
         system: '너는 연결 확인용 도우미다. 아주 짧게 답한다.',
         user: '"연결됨"이라고만 답하세요.',
-        maxTokens: 24, temperature: 0, timeoutMs: 30000
+        /* 추론형 모델(gpt-oss·nemotron)은 24토큰이면 생각만 하다 빈 응답이 오므로 넉넉히 준다. */
+        maxTokens: 512, temperature: 0, timeoutMs: 30000
       });
       return { ok: true, message: '정상 ✓ ' + String(out).slice(0, 16), ms: now() - t0 };
     } catch (e) {
@@ -1483,6 +1510,8 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
   window.HanFreeAI = {
     KEY: POOL_KEY,
     TYPES: TYPES,
+    MODELS: MODELS,
+    RETIRED: RETIRED,
     CLAUDE_MODELS: CLAUDE_MODELS,
     load: load,
     save: save,
@@ -1531,7 +1560,7 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
   };
 
   const DEFAULTS = {
-    models: { anthropic: 'claude-sonnet-5-5', openai: 'gpt-4o-mini', gemini: 'gemini-2.5-flash', perplexity: 'sonar' },
+    models: { anthropic: 'claude-sonnet-5-5', openai: 'gpt-4o-mini', gemini: 'gemini-3.5-flash', perplexity: 'sonar' },
     company: '한경동 AI 오피스',
     owner: '한경동',
     mode: 'auto',
