@@ -966,8 +966,17 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
     var list = Array.isArray(pool.providers) ? pool.providers : [];
     _migrated = false;
     pool.providers = list.map(normProvider).filter(Boolean);
-    /* 옛 404 모델명을 새 모델명으로 바꿨다면 곧바로 저장한다(새로고침만으로 바로 동작). */
-    if (_migrated) { try { save(pool); } catch (e) { /* 저장 실패해도 이번 세션은 새 모델로 동작 */ } }
+    /* 옛 404 모델명을 새 모델명으로 바꿨다면 곧바로 저장한다(새로고침만으로 바로 동작).
+       허브가 쓰는 mode·통계·키별 상태는 그대로 두고 providers 목록만 되쓴다. */
+    if (_migrated) {
+      try {
+        var keep = {};
+        try { keep = JSON.parse(localStorage.getItem(POOL_KEY) || '{}') || {}; } catch (e) { keep = {}; }
+        keep.providers = pool.providers;
+        keep.updatedAt = new Date().toISOString();
+        localStorage.setItem(POOL_KEY, JSON.stringify(keep));
+      } catch (e) { /* 저장 실패해도 이번 세션은 새 모델로 동작 */ }
+    }
     pool.claudeFallbackEnabled = pool.claudeFallbackEnabled !== false;
     /* free-ai-hub가 쓰는 mode 값과 같은 뜻으로 맞춘다 (free_only = 100% 무료만) */
     if (pool.mode === 'free_only') pool.claudeFallbackEnabled = false;
