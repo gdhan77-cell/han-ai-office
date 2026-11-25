@@ -1041,7 +1041,9 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
       url = 'https://openrouter.ai/api/v1/chat/completions';
       headers = {
         'Content-Type': 'application/json', 'Authorization': 'Bearer ' + p.apiKey,
-        'HTTP-Referer': (location.origin || 'https://gdhan77-cell.github.io') + '/', 'X-Title': '한경동 AI'
+        'HTTP-Referer': (location.origin || 'https://gdhan77-cell.github.io') + '/',
+        /* 헤더 값은 ASCII만 — 한글을 넣으면 브라우저가 fetch를 거부해 '연결 실패'가 난다. */
+        'X-Title': 'HANGYEONGDONG AI'
       };
       body = {
         model: p.model || TYPES.openrouter.model, temperature: temp, max_tokens: maxTokens,
