@@ -2705,10 +2705,15 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
       '<div class="stat"><b>' + st.done + '</b><span>승인</span></div>' +
       '<div class="stat"><b>' + st.rejected + '</b><span>반려</span></div>';
 
-    const m = decideMode();
-    $('modeNote').innerHTML = m.kind === 'demo'
-      ? '지금은 <b>데모 모드</b>입니다. 키를 넣으면 실제 AI가 부서 직원 역할을 합니다.'
-      : '지금은 <b>' + esc(m.summary) + '</b>입니다.';
+    syncModeNote();
+  }
+  function syncModeNote() {
+    try {
+      const m = decideMode();
+      $('modeNote').innerHTML = m.kind === 'demo'
+        ? '지금은 <b>데모 모드</b>입니다. 키를 넣으면 실제 AI가 부서 직원 역할을 합니다.'
+        : '지금은 <b>' + esc(m.summary) + '</b>입니다.';
+    } catch (e) { /* 아직 화면이 없으면 넘어간다 */ }
   }
   /* ────────────────────────── 4. AI 엔진 ────────────────────────── */
   function keyOf(p) { return (state.settings.keys[p] || '').trim(); }
@@ -3853,7 +3858,9 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
     loadState();
     applyScale();
     bindEvents();
-    try { poolUI = window.HanFreeAI ? HanFreeAI.mount($('freeAiPool'), { onChange: function () { renderAll(); } }) : null; } catch (e) { poolUI = null; }
+    /* 변경 때 화면 전체를 다시 그리면 키 풀 UI(입력·테스트 결과)까지 새로 만들어져 타이핑과 테스트 결과가 사라진다.
+       그래서 키 풀 UI는 건드리지 않고 아래쪽 모드 안내 문구만 갱신한다. */
+    try { poolUI = window.HanFreeAI ? HanFreeAI.mount($('freeAiPool'), { onChange: function () { renderHeader(); syncModeNote(); } }) : null; } catch (e) { poolUI = null; }
     renderAll();
     syncSettingsForm();
     updateComposeSub();
