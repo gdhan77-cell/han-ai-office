@@ -405,6 +405,7 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
 .set-card h3{font-size:.88rem;font-weight:800;margin-bottom:.5rem;display:flex;align-items:center;gap:.35rem}
 .set-card h3 .n{font-size:.64rem;background:var(--paper3);border:1px solid var(--line);border-radius:999px;padding:0 .4rem;color:var(--ink3)}
 .keyrow{display:flex;gap:.3rem;align-items:center;flex-wrap:wrap}
+.keyrow label small{display:block;font-size:.6rem;font-weight:600;opacity:.72;line-height:1.3}
 .keyrow input{flex:1 1 9rem;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.74rem}
 .kr-status{font-size:.68rem;color:var(--ink3);flex:1 1 100%}
 .prov-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(9.5rem,1fr));gap:.35rem}
@@ -694,13 +695,30 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
               <button type="button" class="btn small" data-test="perplexity">연결 테스트</button>
               <span class="kr-status" id="st_perplexity"></span>
             </div>
+            <div class="keyrow" data-p="groq">
+              <label for="key_groq" style="font-size:.72rem;font-weight:700;width:6.4rem">그록 <small>Groq 무료</small></label>
+              <input type="password" id="key_groq" placeholder="gsk_…" autocomplete="off" spellcheck="false" aria-label="Groq API 키">
+              <button type="button" class="btn small ghost" data-eye="groq">보기</button>
+              <button type="button" class="btn small" data-test="groq">연결 테스트</button>
+              <span class="kr-status" id="st_groq"></span>
+            </div>
+            <div class="keyrow" data-p="openrouter">
+              <label for="key_openrouter" style="font-size:.72rem;font-weight:700;width:6.4rem">오픈라우터 <small>OpenRouter</small></label>
+              <input type="password" id="key_openrouter" placeholder="sk-or-…" autocomplete="off" spellcheck="false" aria-label="OpenRouter API 키">
+              <button type="button" class="btn small ghost" data-eye="openrouter">보기</button>
+              <button type="button" class="btn small" data-test="openrouter">연결 테스트</button>
+              <span class="kr-status" id="st_openrouter"></span>
+            </div>
           </div>
           <div class="note" style="margin-top:.45rem">
             키는 <b>이 브라우저(localStorage)에만</b> 저장되고, 업무를 맡길 때 해당 회사 서버로만 전송됩니다.
             공용 컴퓨터에서는 저장하지 마세요. 발급: <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic</a> ·
             <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">OpenAI</a> ·
             <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google</a> ·
-            <a href="https://www.perplexity.ai/settings/api" target="_blank" rel="noopener">Perplexity</a>
+            <a href="https://www.perplexity.ai/settings/api" target="_blank" rel="noopener">Perplexity</a> ·
+            <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq</a> ·
+            <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter</a><br>
+            <b>그록·오픈라우터는 무료 키</b>입니다. 넣으면 아래 [무료 AI 키 풀]에도 함께 저장되고, 실행 모드를 <b>무료 AI 자동 전환</b>으로 두면 이 키들로 업무를 처리합니다.
           </div>
           <div class="btn-row" style="margin-top:.45rem">
             <button type="button" class="btn small primary" id="btnSaveKeys">키 저장</button>
@@ -950,6 +968,18 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
       lastErrorAt: p.lastErrorAt || '',
       lastOkAt: p.lastOkAt || ''
     });
+  }
+  /* 무료 키 풀에 해당 종류의 칸이 없으면 기본 빈 칸을 하나 만들어 돌려준다. */
+  function ensureType(pool, type) {
+    for (var i = 0; i < pool.providers.length; i++) {
+      if (pool.providers[i].type === type) return pool.providers[i];
+    }
+    var p = {
+      id: uid(), type: type, label: TYPES[type].short + ' 1', apiKey: '',
+      model: TYPES[type].model, enabled: true, priority: pool.providers.length + 1
+    };
+    pool.providers.push(p);
+    return p;
   }
   function load() {
     var pool = blank();
@@ -1331,18 +1361,19 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
     function render() {
       var pool = load();
       var use = ordered(pool);
+      var filled = pool.providers.filter(function (p) { return clean(p.apiKey); }).length;
+      /* Gemini·Groq·OpenRouter 세 칸은 처음부터 열려 있게 한다 — 키가 없는 종류는 바로 입력할 수 있는 빈 칸으로 그린다. */
+      var hasType = {};
+      pool.providers.forEach(function (p) { hasType[p.type] = true; });
+      var missing = ['gemini', 'groq', 'openrouter'].filter(function (t) { return !hasType[t]; });
       var html = '';
-      html += '<div class="hfa-head"><b>무료 AI 키 풀</b><span class="hfa-count">사용 가능 ' + use.length + '개 · 등록 ' + pool.providers.length + '개</span></div>';
-      html += '<p class="hfa-note">Gemini·Groq·OpenRouter 무료 키를 여러 개 넣어 두면, 한도(429)나 오류가 난 키는 건너뛰고 <b>다음 키로 자동 전환</b>합니다. 이 키 묶음은 이 브라우저의 <code>han_free_ai_pool_v1</code>에 저장되어 <b>free-ai-hub</b>와 같은 주소의 다른 앱이 함께 씁니다.' +
-        (use.length ? '' : ' <b>아직 쓸 수 있는 무료 키가 없습니다.</b>') + '</p>';
+      html += '<div class="hfa-head"><b>무료 AI 키 풀</b><span class="hfa-count">사용 가능 ' + use.length + '개 · 키 입력 ' + filled + '개</span></div>';
+      html += '<p class="hfa-note">Gemini·Groq·OpenRouter 무료 키를 아래 칸에 바로 붙여 넣으면 됩니다. 여러 개 넣어 두면 한도(429)나 오류가 난 키는 건너뛰고 <b>다음 키로 자동 전환</b>합니다. 이 키 묶음은 이 브라우저의 <code>han_free_ai_pool_v1</code>에 저장되어 <b>free-ai-hub</b>와 같은 주소의 다른 앱이 함께 씁니다. 키 발급: ' +
+        '<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Gemini</a> · ' +
+        '<a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq</a> · ' +
+        '<a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter</a></p>';
 
       html += '<div class="hfa-rows">';
-      if (!pool.providers.length) {
-        html += '<div class="hfa-empty">아래 [+ Gemini] 같은 버튼으로 무료 키를 추가하세요. 키 발급: ' +
-          '<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Gemini</a> · ' +
-          '<a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq</a> · ' +
-          '<a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter</a></div>';
-      }
       pool.providers.forEach(function (p, i) {
         var T = TYPES[p.type];
         var stateMsg = '';
@@ -1365,6 +1396,18 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
           '</div>' +
           '<div class="hfa-msg" data-msg></div>' +
           (stateMsg ? stateMsg : '') +
+        '</div>';
+      });
+      missing.forEach(function (t) {
+        var T = TYPES[t];
+        html += '<div class="hfa-row" data-new="' + t + '">' +
+          '<label class="hfa-en"><input type="checkbox" checked disabled> 기본 칸</label>' +
+          '<span class="hfa-type">' + esc(T.short) + '</span>' +
+          '<input type="text" data-f="label" value="' + esc(T.short) + ' 1" aria-label="키 이름">' +
+          '<div class="hfa-keyw"><input type="password" data-f="apiKey" value="" placeholder="' + esc(T.ph) + '" autocomplete="off" spellcheck="false" aria-label="API 키"><button type="button" data-a="eye" title="보기">👁</button></div>' +
+          '<input class="hfa-modelin" type="text" data-f="model" value="' + esc(T.model) + '" aria-label="모델명">' +
+          '<div class="hfa-acts"><button type="button" data-a="test">테스트</button></div>' +
+          '<div class="hfa-msg" data-msg></div>' +
         '</div>';
       });
       html += '</div>';
@@ -1451,6 +1494,31 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
         return;
       }
       if (a === 'test') {
+        var newType = row.getAttribute('data-new');
+        if (newType) {
+          /* 아직 저장 전인 기본 빈 칸 — 확인에 성공하면 그 자리에서 키 칸으로 만든다. */
+          var mNew = row.querySelector('[data-msg]');
+          var probe = {
+            type: newType,
+            apiKey: clean(row.querySelector('[data-f="apiKey"]').value),
+            model: clean(row.querySelector('[data-f="model"]').value) || TYPES[newType].model,
+            label: clean(row.querySelector('[data-f="label"]').value) || TYPES[newType].short
+          };
+          if (!probe.apiKey) { if (mNew) { mNew.className = 'hfa-msg err'; mNew.textContent = '키를 입력하세요'; } return; }
+          btn.disabled = true; btn.textContent = '확인 중…';
+          var resNew = await testProvider(probe);
+          btn.disabled = false; btn.textContent = '테스트';
+          if (mNew) { mNew.className = 'hfa-msg ' + (resNew.ok ? 'ok' : 'err'); mNew.textContent = resNew.message; }
+          if (resNew.ok) {
+            var plNew = load();
+            var tNew = ensureType(plNew, newType);
+            tNew.apiKey = probe.apiKey; tNew.model = probe.model; tNew.label = probe.label;
+            tNew.enabled = true; tNew.lastError = ''; tNew.cooldownUntil = 0; tNew.lastOkAt = new Date().toISOString();
+            persist(plNew);
+            render();
+          }
+          return;
+        }
         var p = load().providers.find(function (x) { return x.id === id; });
         if (!p) return;
         p.apiKey = clean(row.querySelector('[data-f="apiKey"]').value);
@@ -1484,8 +1552,15 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
       ui.timer = setTimeout(function () {
         var pool = load();
         if (row && f) {
-          var id = row.getAttribute('data-id');
-          var p = pool.providers.find(function (x) { return x.id === id; });
+          var newTypeIn = row.getAttribute('data-new');
+          var p;
+          if (newTypeIn) {
+            /* 기본 빈 칸은 실제로 값을 넣을 때만 키 칸으로 만든다. */
+            if (!clean(t.value)) return;
+            p = ensureType(pool, newTypeIn);
+          } else {
+            p = pool.providers.find(function (x) { return x.id === row.getAttribute('data-id'); });
+          }
           if (!p) return;
           if (f === 'apiKey') p.apiKey = clean(t.value);
           else if (f === 'label') p.label = clean(t.value);
@@ -1533,6 +1608,29 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
     testClaude: testClaude,
     usableCount: usableCount,
     poolSummary: poolSummary,
+    /* 앱 설정 화면의 무료 키 입력칸이 쓰는 통로 — 첫 번째 키 읽기/쓰기 */
+    keyOf: function (type) {
+      var list = load().providers.filter(function (p) { return p.type === type; });
+      return list.length ? clean(list[0].apiKey) : '';
+    },
+    setKey: function (type, key) {
+      if (!TYPES[type]) return '';
+      var v = clean(key);
+      var pool = load();
+      var p = null;
+      for (var i = 0; i < pool.providers.length; i++) {
+        if (pool.providers[i].type === type) { p = pool.providers[i]; break; }
+      }
+      if (!p) {
+        if (!v) return '';
+        p = ensureType(pool, type);
+      }
+      if (p.apiKey === v) return v;
+      p.apiKey = v;
+      if (v) { p.enabled = true; p.lastError = ''; p.cooldownUntil = 0; }
+      save(pool);
+      return v;
+    },
     mount: mount,
     statusKr: statusKr
   };
@@ -2681,6 +2779,17 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
       $('st_' + p).textContent = s.keys[p] ? '저장됨 · ' + (s.models[p] || '') : '키 없음';
       $('st_' + p).style.color = s.keys[p] ? 'var(--ok)' : 'var(--ink3)';
     });
+    /* 그록·오픈라우터는 무료 키라서 무료 키 풀(han_free_ai_pool_v1)에서 읽고 쓴다. */
+    ['groq', 'openrouter'].forEach((p) => {
+      const el = $('key_' + p);
+      if (!el) return;
+      const v = window.HanFreeAI ? HanFreeAI.keyOf(p) : '';
+      if (document.activeElement !== el) el.value = v;
+      el.type = 'password';
+      const st = $('st_' + p);
+      st.textContent = v ? '무료 키 풀에 저장됨' : '키 없음';
+      st.style.color = v ? 'var(--ok)' : 'var(--ink3)';
+    });
     $('setMode').value = s.mode;
     $('setDelegate').value = s.delegate;
     $('setMaxTokens').value = String(s.maxTokens);
@@ -3527,6 +3636,7 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
     ['anthropic', 'openai', 'gemini', 'perplexity'].forEach((p) => {
       state.settings.keys[p] = ($('key_' + p).value || '').trim();
     });
+    syncPoolKeys();
     save(true);
     renderAll();
     toast(availableProviders().length ? '키를 저장했습니다. 이제 실제 AI가 일합니다.' : '키를 저장했습니다. 지금은 데모 모드입니다.');
@@ -3539,7 +3649,45 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
     syncSettingsForm();
     toast('키를 지웠습니다. 데모 모드로 돌아갑니다.');
   }
+  /* 그록·오픈라우터 무료 키 — 무료 키 풀에 저장하고 그 자리에서 확인한다. */
+  async function testFreeProvider(p) {
+    const key = ($('key_' + p).value || '').trim();
+    const st = $('st_' + p);
+    const label = p === 'groq' ? '그록' : '오픈라우터';
+    if (!key) { st.textContent = '키를 입력하세요'; st.style.color = 'var(--warn)'; return; }
+    if (!window.HanFreeAI) { st.textContent = '무료 AI 엔진을 불러오지 못했습니다'; st.style.color = 'var(--warn)'; return; }
+    st.textContent = '확인 중…'; st.style.color = 'var(--ink3)';
+    let r = null;
+    try {
+      r = await HanFreeAI.testProvider({ type: p, apiKey: key, label: label });
+    } catch (e) { r = { ok: false, message: String(e.message || e.code || '오류') }; }
+    if (r && r.ok) {
+      HanFreeAI.setKey(p, key);
+      st.textContent = '정상 ✓ 무료 키 풀에 저장됨';
+      st.style.color = 'var(--ok)';
+      st.title = r.message || '';
+      if (poolUI && poolUI.refresh) poolUI.refresh();
+      renderHeader();
+      toast(label + ' 무료 키 연결 확인 — 무료 키 풀에 저장했습니다.');
+    } else {
+      st.textContent = String((r && r.message) || '연결하지 못했습니다').slice(0, 70);
+      st.style.color = 'var(--warn)';
+      st.title = (r && r.message) || '';
+    }
+  }
+
+  /* 그록·오픈라우터 무료 키를 무료 키 풀에 반영한다(앱 설정 화면 ↔ free-ai-hub 공유 저장소). */
+  function syncPoolKeys() {
+    if (!window.HanFreeAI) return;
+    ['groq', 'openrouter'].forEach((p) => {
+      const el = $('key_' + p);
+      if (el) HanFreeAI.setKey(p, (el.value || '').trim());
+    });
+    if (poolUI && poolUI.refresh) poolUI.refresh();
+  }
+
   async function testProvider(p) {
+    if (p === 'groq' || p === 'openrouter') return testFreeProvider(p);
     const key = ($('key_' + p).value || '').trim();
     const st = $('st_' + p);
     if (!key) { st.textContent = '키를 입력하세요'; st.style.color = 'var(--warn)'; return; }
@@ -3827,6 +3975,12 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
     ['anthropic', 'openai', 'gemini', 'perplexity'].forEach((p) => {
       $('key_' + p).addEventListener('change', () => { state.settings.keys[p] = ($('key_' + p).value || '').trim(); save(true); renderAll(); });
       $('key_' + p).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); testProvider(p); } });
+    });
+    ['groq', 'openrouter'].forEach((p) => {
+      const el = $('key_' + p);
+      if (!el) return;
+      el.addEventListener('change', () => { syncPoolKeys(); renderAll(); });
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); testProvider(p); } });
     });
 
     $$('#scaleSeg button').forEach((b) => b.addEventListener('click', () => {
