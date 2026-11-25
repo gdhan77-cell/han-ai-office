@@ -3676,6 +3676,22 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
     }
   }
 
+  /* 무료 키 풀(그록·오픈라우터)과 설정 입력칸을 맞춘다 — 입력 중인 칸과 다른 설정 값은 건드리지 않는다. */
+  function syncFreeKeyRows() {
+    if (!window.HanFreeAI) return;
+    ['groq', 'openrouter'].forEach((p) => {
+      const el = $('key_' + p);
+      if (!el || document.activeElement === el) return;
+      const v = HanFreeAI.keyOf(p);
+      if (el.value !== v) el.value = v;
+      const st = $('st_' + p);
+      if (st) {
+        st.textContent = v ? '무료 키 풀에 저장됨' : '키 없음';
+        st.style.color = v ? 'var(--ok)' : 'var(--ink3)';
+      }
+    });
+  }
+
   /* 그록·오픈라우터 무료 키를 무료 키 풀에 반영한다(앱 설정 화면 ↔ free-ai-hub 공유 저장소). */
   function syncPoolKeys() {
     if (!window.HanFreeAI) return;
@@ -4025,7 +4041,7 @@ input[type=text]:focus,input[type=password]:focus,textarea:focus,.sel:focus{bord
     bindEvents();
     /* 변경 때 화면 전체를 다시 그리면 키 풀 UI(입력·테스트 결과)까지 새로 만들어져 타이핑과 테스트 결과가 사라진다.
        그래서 키 풀 UI는 건드리지 않고 아래쪽 모드 안내 문구만 갱신한다. */
-    try { poolUI = window.HanFreeAI ? HanFreeAI.mount($('freeAiPool'), { onChange: function () { renderHeader(); syncModeNote(); } }) : null; } catch (e) { poolUI = null; }
+    try { poolUI = window.HanFreeAI ? HanFreeAI.mount($('freeAiPool'), { onChange: function () { renderHeader(); syncModeNote(); syncFreeKeyRows(); } }) : null; } catch (e) { poolUI = null; }
     renderAll();
     syncSettingsForm();
     updateComposeSub();
